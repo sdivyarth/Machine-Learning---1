@@ -1,0 +1,72 @@
+#!/usr/bin/env python3
+# -*- coding: utf-8 -*-
+"""
+Created on Sat Sep 14 15:36:18 2019
+
+@author: divyarth
+"""
+
+#!/usr/bin/env python3
+# -*- coding: utf-8 -*-
+"""
+Created on Tue Sep 10 11:46:50 2019
+
+@author: divyarth
+"""
+import numpy as np
+import scipy as sp 
+import pandas as pd
+import sys
+#Importing the data
+
+from numpy.random import seed
+seed(1)
+from tensorflow import set_random_seed
+set_random_seed(1)
+
+data = pd.read_csv(sys.argv[1],header=None,delimiter=' ').values
+data_test = pd.read_csv(sys.argv[2],header=None,delimiter=' ').values
+#Training Data
+
+X_train=data[:,:-1]
+X_train=X_train[:,]
+y_train=data[:,-1]
+X_test=data_test[:,:-1]
+
+X_train=X_train.reshape(len(X_train),3,32,32).transpose([0,2, 3, 1])/255
+X_test=X_test.reshape(len(X_test),3,32,32).transpose([0,2, 3, 1])/255
+
+#Test Data
+#One-hot conversion to target variable
+
+from keras.utils import to_categorical
+
+y_train = to_categorical(y_train)
+
+#Creating the model
+
+from keras.models import Sequential
+from keras.layers import Conv2D,Activation,Dense,MaxPooling2D,Flatten,BatchNormalization
+
+model = Sequential()
+model.add(Conv2D(64,(3,3),activation='relu',input_shape=(32,32,3)))
+model.add(MaxPooling2D((2, 2)))
+model.add(Conv2D(128,(3,3),activation='relu'))
+model.add(MaxPooling2D((2, 2)))
+model.add(Flatten())
+model.add(Dense(512,use_bias=True,activation='relu'))
+model.add(Dense(256,use_bias=True,activation='relu'))
+model.add(BatchNormalization())
+model.add(Dense(10,activation='softmax'))
+
+#Compiling the model
+
+model.compile(optimizer='adam', loss='categorical_crossentropy', metrics=['accuracy'])
+from keras.callbacks import EarlyStopping
+es=EarlyStopping(monitor='val_loss', min_delta=0, patience=5, verbose=0, mode='auto', baseline=None, restore_best_weights=True)
+hist=model.fit(X_train, y_train, validation_split=0.20, epochs=10,callbacks=[es])
+y_test=model.predict(X_test)
+y_test=y_test.argmax(axis=1)
+
+np.savetxt(sys.argv[3],y_test,delimiter='\n')
+
