@@ -1,0 +1,88 @@
+#!/usr/bin/env python3
+# -*- coding: utf-8 -*-
+"""
+Created on Tue Oct 29 16:44:00 2019
+
+@author: divyarth
+"""
+import sys
+#sys.argv=['','train.csv']
+import numpy as np
+import pandas as pd
+data = pd.read_csv(sys.argv[1],header=None,delimiter=',')
+data1=pd.read_csv(sys.argv[2],header=None,delimiter=',').values
+X_test=data1[:,:-1]
+
+def pega_mini_batch(X_inp,y,T,lamda,batch_size):        
+    
+    k=int(len(X_inp)/batch_size)
+    X=X_inp
+    X_split=np.split(X,k)
+    y_split=np.split(y,k)
+    w=np.zeros(X[0].shape)
+    b=0
+    for i in range(int(T)):
+        eta=1/(lamda*(i+1))
+        #eta=0.0001
+        #j=np.random.randint(low=0, high=k, size=1)[0]    
+        j= (i%k)
+        bool_ind=np.multiply(X_split[j].dot(w)+b,y_split[j])<=1
+        if bool_ind.sum()!=0:     
+            X_=X_split[j][bool_ind]
+            y_=y_split[j][bool_ind]
+            der= X_.T.dot(y_)/batch_size
+            der_b= y_.sum()/batch_size
+            w= w*(1-eta*lamda)+eta*der
+            b= b+lamda*eta*der_b
+    return w,b
+
+def all_class(data,T,C,batch_size):
+    
+    w=[]
+    b=[]
+    
+    for i in range(10):
+        
+        w1=[]
+        b1=[]
+        
+        for j in range(i+1,10,1):
+
+            d1=data[data[784]==i]
+            d2=data[data[784]==j]
+            
+            d=pd.concat([d1,d2])
+            data_train=d.sample(frac=1,random_state=1).values
+            #data_train=d.values
+            X_train=data_train[:,:-1]/255
+            y_train=data_train[:,-1]
+            y_train[y_train==i]=-1
+            y_train[y_train!=-1]=1
+            
+            # -1 corresponds to ith, the first index
+            w_,b_=pega_mini_batch(X_train,y_train,T,C,batch_size)
+            w1.append(w_)
+            b1.append(b_)
+            
+        w.append(w1)
+        b.append(b1)
+        
+    return w,b
+
+from scipy.stats import mode as mode
+
+def classify(X_test,w,b):
+    lst=[]
+    X=X_test
+    for i in range(10):
+        for j in range(0,9-i,1):
+            y_pred=(j+1+i)*np.ones((len(X),1))
+            y_pred[(X.dot(w[i][j])+b[i][j])<0]=i
+            lst.append(y_pred)
+    out=mode(np.array(lst),axis=0)
+    return out[0]
+
+w,b=all_class(data,100,0.2,50)  #0.87125
+y_test=classify(X_test,w,b)
+y_test=y_test.flatten()
+np.savetxt(sys.argv[3],y_test,delimiter='\n')
