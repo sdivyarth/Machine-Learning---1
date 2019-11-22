@@ -1,0 +1,146 @@
+#!/usr/bin/env python3
+# -*- coding: utf-8 -*-
+"""
+Created on Sun Aug 18 12:42:26 2019
+@author: divyarth
+"""
+
+import numpy as np
+import pandas as pd
+from sklearn.preprocessing import LabelEncoder
+import sys
+
+labels=['bias','0_usual', '0_pretentious', '0_great_pret', 
+'1_proper', '1_less_proper', '1_improper', '1_critical', '1_very_crit', 
+'2_complete', '2_completed', '2_incomplete', '2_foster', 
+'3_1', '3_2', '3_3', '3_more', 
+'4_convenient', '4_less_conv', '4_critical', 
+'5_convenient', '5_inconv', 
+'6_nonprob', '6_slightly_prob', '6_problematic', 
+'7_recommended', '7_priority', '7_not_recom']
+
+data = pd.read_csv(sys.argv[1],header=None)
+
+data.columns=['0','1','2','3','4','5','6','7','response']
+data['bias']=pd.Series(np.asarray(len(data)*[1])) #'8' is the bias
+X_temp=data[['0','1','2','3','4','5','6','7','bias']]
+y_temp=data['response']
+
+le = LabelEncoder()
+
+le.fit(y_temp)
+y=le.transform(y_temp)
+X=pd.get_dummies(X_temp)
+X=X[labels]
+
+num_ftr = len(X.columns)
+num_dat=len(data)
+num_res=len(le.classes_)  # added one for bias
+w=np.zeros((num_ftr,num_res))
+w0=w
+data_test = pd.read_csv(sys.argv[2],header=None)
+
+
+data_test.columns=['0','1','2','3','4','5','6','7']
+data_test['bias']=pd.Series(np.asarray(len(data_test)*[1]))
+X_temp_test=data_test[['0','1','2','3','4','5','6','7','bias']]
+X_test=pd.get_dummies(X_temp_test)
+X_test=X_test[labels]
+
+def softmax(w,X):
+    e_ = np.sum(np.exp(np.dot(X,w)),axis=1)
+    d_temp= np.ones((5,len(X)))
+    for i in range(5):
+        d_temp[i] = e_
+    y = np.divide(np.exp(np.dot(X,w)),d_temp.T)
+    return (y)
+    
+def loss(y_hat,y):    
+    alpha=pd.DataFrame(pd.get_dummies(y))
+    return -np.log(y_hat[alpha!=0].sum(axis=1)).sum()/len(y)
+
+def get_loss(w,X,y):
+    y_hat=softmax(w,X)
+    return loss(y_hat,y)
+
+def gradDes(X,y,w0,eta,iter0):
+    loss=get_loss(w0,X,y)
+    p=softmax(w0,X)
+    w=w0
+    alpha=np.asarray(pd.get_dummies(y))
+    for i in range(iter0):
+        p=softmax(w,X)
+        der=X.T.dot(p-alpha)/len(y)
+        w=w-eta*der
+        al=abs(np.asarray(w0-w))
+        if al.all()<1e-8:
+            break        
+    p=softmax(w,X)
+    y_pred=p.idxmax(axis=1)
+    y_pred=le.inverse_transform(y_pred)
+    return y_pred,w
+
+def gradMiniBat(X,y,w0,eta,bat_size,iter0):
+    k=int(len(X)/bat_size)
+    print(k)
+    X_split=np.split(X,k)
+    y_split=np.split(pd.get_dummies(y),k)
+    w=w0
+    itera=iter0
+    for i in range(int(iter0)):
+        for j in range(k):
+            X_=X_split[j]
+            y_=y_split[j]
+            p=softmax(w,X_)
+            der= (X_.T.dot(p-y_)/len(y_))
+            w=w-eta*der
+    print(iter0)
+    return w
+
+
+def gradMiniBatAdap(X,y,w0,eta,bat_size,iter0):
+    k=int(len(X)/bat_size)
+    print(k)
+    X_split=np.split(X,k)
+    y_split=np.split(pd.get_dummies(y),k)
+    w=w0
+    itera=iter0
+    eta0=eta
+    for i in range(int(iter0)):
+        for j in range(k):
+            X_=X_split[j]
+            y_=y_split[j]
+            p=softmax(w,X_)
+            der= (X_.T.dot(p-y_)/len(y_))
+            w=w-eta*der
+        eta=eta0/np.sqrt(i+1)
+    return w
+    print(iter0)
+
+params = pd.read_csv(sys.argv[3],header=None)
+
+if (params.iloc[0,0]) ==1:
+    eta=params.iloc[1,0]
+    iter0=int(params.iloc[2,0])
+    #iter0=10
+    k=int(params.iloc[3,0])
+    w=gradMiniBat(X,y,w0,eta,k,iter0)
+    p=softmax(w,X_test)
+    y_pred=np.argmax(p,axis=1)
+    y_pred=le.inverse_transform(y_pred)
+    np.savetxt(sys.argv[4],y_pred,delimiter=" ", fmt="%s")
+    w=w[[0,2,4,1,3]]
+    np.savetxt(sys.argv[5],w,delimiter=",")    
+
+if (params.iloc[0,0]) ==2:
+    eta=params.iloc[1,0]
+    iter0=int(params.iloc[2,0])
+    #iter0=10
+    k=int(params.iloc[3,0])
+    w=gradMiniBatAdap(X,y,w0,eta,k,iter0)
+    p=softmax(w,X_test)
+    y_pred=np.argmax(p,axis=1)
+    y_pred=le.inverse_transform(y_pred)
+    np.savetxt(sys.argv[4],y_pred,delimiter=" ", fmt="%s")
+    w=w[[0,2,4,1,3]]
+    np.savetxt(sys.argv[5],w,delimiter=",")    
