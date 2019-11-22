@@ -1,0 +1,86 @@
+#!/usr/bin/env python3
+# -*- coding: utf-8 -*-
+"""
+Created on Wed Aug  7 22:00:27 2019
+
+@author: divyarth
+"""
+
+import numpy as np
+from numpy import genfromtxt
+import csv
+import sys
+
+def get_weight(X_train,y_train,lamda):
+    return np.linalg.inv(X_train.T.dot(X_train)+lamda*np.eye(len(X_train[0,:]))).dot(X_train.T).dot(y_train)
+
+def get_kFold(data,k,lamda):
+    data_split=np.split(data,k)
+    def get_split(j):
+        if j==0:
+            return np.concatenate((data_split[1:])),data_split[0]
+        elif j==k-1:
+            return np.concatenate((data_split[:-1])),data_split[-1]
+        else:
+            return np.concatenate((np.concatenate(data_split[:j]),np.concatenate(data_split[j+1:]))),data_split[j]    
+    err=0
+    for i in range(k): 
+        tot_train,tot_val=get_split(i)
+        y_train=tot_train[:,-1]
+        X_train=np.concatenate((tot_train[:,:-1],np.ones((len(y_train),1))),axis=1)
+        y_val=tot_val[:,-1]
+        X_val=np.concatenate((tot_val[:,:-1],np.ones((len(y_val),1))),axis=1)        
+        w=get_weight(X_train,y_train,lamda)
+        err+=abs(y_val-X_val.dot(w)).sum()
+    return err,w
+
+if (sys.argv[1])=='a':
+    print('a')
+    #with open(sys.argv[2]) as f:    
+        #data=np.asarray(list(csv.reader(f,dtype='float')))    
+    data = np.loadtxt(sys.argv[2]  ,dtype='float',delimiter=',')
+    y_train=data[:,-1]
+    X_train=np.concatenate((np.ones((len(y_train),1)),data[:,:-1]),axis=1)
+    w=get_weight(X_train,y_train,0)
+    data = np.loadtxt(sys.argv[3]  ,dtype='float',delimiter=',')
+    X_test=np.concatenate((np.ones((len(data),1)),data),axis=1)
+    y_pred=X_test.dot(w)
+    np.savetxt(sys.argv[4],y_pred)
+    np.savetxt(sys.argv[5],w)
+    
+    
+elif (sys.argv[1])=='b':
+    data = np.loadtxt(sys.argv[2]  ,dtype='float',delimiter=',')
+    data1 = np.loadtxt(sys.argv[3]  ,dtype='float',delimiter=',')
+    contents=np.loadtxt(sys.argv[4]  ,dtype='float',delimiter=',')
+    X_test=np.concatenate((data1,np.ones((len(data1),1))),axis=1)    
+    w_arr=[]
+    err=[]
+    for i in range(len(contents)):
+        error,w=(get_kFold(data,10,contents[i]))
+        w_arr.append(w)
+        err.append(error)
+    lamda=contents[np.argmin(abs(np.asarray(err)))]
+    print(lamda)
+    w=get_weight(np.append(data[:,:-1],np.ones((len(data),1)),axis=1),data[:,-1],lamda)
+    y_pred= X_test.dot(w)
+    np.savetxt(sys.argv[5],y_pred)
+    shape=w.shape
+    w=np.asarray(np.append(w[-1],w[:-1])).reshape(shape)
+    np.savetxt(sys.argv[6],w)
+    
+
+
+if (sys.argv[1])=='c':
+    print('a')
+    #with open(sys.argv[2]) as f:    
+        #data=np.asarray(list(csv.reader(f,dtype='float')))    
+    data = np.loadtxt(sys.argv[2]  ,dtype='float',delimiter=',')
+    y_train=data[:,-1]
+    X_train=np.concatenate((np.ones((len(y_train),1)),data[:,:-1]),axis=1)
+    w=get_weight(X_train,y_train,0)
+    data = np.loadtxt(sys.argv[3]  ,dtype='float',delimiter=',')
+    X_test=np.concatenate((np.ones((len(data),1)),data),axis=1)
+    y_pred=X_test.dot(w)
+    np.savetxt(sys.argv[4],y_pred)
+    
