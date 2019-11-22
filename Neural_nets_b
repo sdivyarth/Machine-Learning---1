@@ -1,0 +1,140 @@
+#Your code goes here
+#!/usr/bin/env python3
+import numpy as np
+import sys
+from sklearn.preprocessing import OneHotEncoder
+
+data = np.loadtxt(sys.argv[1],dtype='float',delimiter=',')
+
+X_train=data[:,:-1]
+y_train=data[:,-1]
+
+# Convert the output in the form of one hot encoding
+y=y_train.reshape((-1,1))
+enc = OneHotEncoder(handle_unknown='ignore')
+encoder=enc.fit(y)
+y=encoder.transform(y).toarray()
+
+#Given a list in the following format: [input, hidden_neurons1, hidden_nurons2,... , output] 
+#gives the zeros initialized weight matrix 
+
+def get_random_weights(lst):
+    n=len(lst)
+    w=[]
+    b=[]
+    for i in range(n-1):
+        w.append(np.zeros((lst[i+1],lst[i])))
+        b.append(np.zeros((lst[i+1])))
+    return (w),(b)
+
+def sigmoid(z):
+    return 1./(1.+np.exp(-z))
+
+def softmax(z):
+    a = np.exp(z.T)
+    return (a/np.sum(a,axis=0)).T
+
+#Forward Propogation
+
+def FeedForward(W,b,X):
+    
+    out=[X]
+    for i in range(len(W)-1):
+        Z=out[i].dot(W[i].T)+b[i]
+        act=sigmoid(Z)
+        out.append(act)
+    i=-1
+    Z=out[i].dot(W[i].T)+b[i]
+    out.append(softmax(Z))
+    return out
+
+#Backpropogation: Gives the derivative of log loss cost function with respect to weights and biases
+
+
+def Back(W,b,X,y):
+    
+    A=FeedForward(W,b,X)
+    delta= A[-1]-y
+    del_=[]
+    del_.append(delta)
+    
+    for i in range(len(W)-1,0,-1):
+        delta=delta.dot(W[i])*(A[i]*(1-A[i]))
+        del_.append(delta)
+
+    del_.reverse()
+    out=[]
+    out1=[]
+    i=0
+    
+    for i in range(len(W)):
+        alpha=A[i].T.dot(del_[i])/len(X)
+        out.append(alpha.T)
+        out1.append((del_[i].sum(axis=0))/len(X))
+
+    return (out),(out1)
+    
+#Normal Mini Batch Gradient Decent
+
+def gradDes(X,y,w0,b0,eta,iter0,batch_size):
+    n=len(X)
+    k=int(len(X)/batch_size)
+    w=w0
+    b=b0
+    alpha=0
+    for i in range(iter0):
+        ind=(i%k)*batch_size
+        ind1=((i%k)+1)*batch_size
+        w0=w
+        b0=b
+        derW,derb=Back(w0,b0,X[ind:ind1],y[ind:ind1])
+        for i in range(len(w)):
+            w[i]=w0[i]-eta*(derW[i])
+            b[i]=b0[i]-eta*derb[i]
+    return w,b
+    
+#Adaptive Mini Batch Gradient Decent 
+
+def gradDesAdap(X,y,w0,b0,eta0,iter0,batch_size):
+    n=len(X)
+    k=int(len(X)/batch_size)
+    w=w0
+    b=b0
+    for i in range(iter0):
+        ind=(i%k)*batch_size
+        ind1=((i%k)+1)*batch_size
+        w0=w
+        b0=b
+        derW,derb=Back(w0,b0,X[ind:ind1],y[ind:ind1])
+        eta=eta0/(np.sqrt(i+1))
+        for i in range(len(w)):
+            w[i]=w0[i]-eta*(derW[i])
+            b[i]=b0[i]-eta*derb[i]
+    return w,b
+
+#Testing the code
+
+f=open(sys.argv[2],'r')
+s=f.read()
+a=s.split()
+mode=int(a[0])
+eta=float(a[1])
+iter0=int(a[2])
+batch_size=int(a[3])
+neurons= list(map(int,a[4:]))
+lst=[len(X_train[0])]
+[lst.append(s) for s in neurons] 
+lst.append(len(y[0]))
+w0,b0=get_random_weights(lst)
+
+if mode==1:
+    W,b=gradDes(X_train,y,w0,b0,eta,int(iter0),batch_size)
+else:
+    W,b=gradDesAdap(X_train,y,w0,b0,eta,int(iter0),batch_size)
+
+weights = open(sys.argv[3], "a")
+
+for i in range(len(W)):
+    np.savetxt(weights,b[i],delimiter="\n")
+    np.savetxt(weights,W[i].T,delimiter="\n")# -*- coding: utf-8 -*-
+
