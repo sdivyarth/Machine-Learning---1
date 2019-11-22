@@ -1,0 +1,121 @@
+import numpy as np
+import pandas as pd
+import sys
+
+#Preprocess Data ~30seconds to run
+
+def parse_txt(txt):
+    punc_list='!"#$%&\'()*+,-./:;<=>?@[\\]^_`{|}~'
+    a_txt=txt.lower()
+    for punc in punc_list:
+        a_txt = a_txt.replace(punc, '')
+    return np.unique(np.array(a_txt.split(' ')))
+
+data = pd.read_csv(sys.argv[1],delimiter=',')
+
+y_train=data.iloc[:,1]
+bool_ind=y_train=='positive'
+y_train[bool_ind]=1
+y_train[~bool_ind]=0
+y=y_train
+
+X=data.iloc[:,0]
+X= X.apply(parse_txt)
+
+data=None
+vocab=X.apply(pd.Series).stack().unique()
+#vocab=vocab[vocab!='']
+n=len(vocab)
+
+def gen_dict():
+    dct={}
+    i=0
+    for a in vocab:
+        dct[a]=i
+        i+=1
+    return dct
+
+alpha=gen_dict()
+
+lst=np.zeros((len(X),len(vocab)),dtype=bool)
+
+for i in range(len(X)):
+    
+    for a in X[i]:
+        lst[i,alpha[a]]=True        
+
+X_train=lst
+y_train=y
+#X_test=lst1
+
+
+#Final Preprocessed data
+
+class naive_bayes:
+    
+    def __init__(self):
+        self.X=None
+        self.y=None
+        self.Xt=None
+        self.p_y1=None
+        self.p_y2=None    
+        self.m=None
+        self.cond_px_y1,self.cond_px_y0 =None,None
+    
+    def prob_x_y(self):
+        k=len(self.y)
+        p_y1=self.y.sum()+2
+        p_y0=(len(self.y)-self.y.sum())+2
+        
+        self.cond_px_y1=[]
+        self.cond_px_y0=[]       
+        
+#        self.cond_px_y1=self.X.T.dot(self.y.values.reshape(-1,1)).T
+        self.m=len(self.X[0])
+        for j in range(self.m):
+            self.cond_px_y1.append((self.X[:,j][self.y==1].sum()+1)/p_y1)
+            self.cond_px_y0.append((self.X[:,j][self.y==0].sum()+1)/p_y0)
+        return np.array(self.cond_px_y1),np.array(self.cond_px_y0)
+    
+    def predict(self,c1,c2):
+        self.cond_px_y1,self.cond_px_y0 = c1,c2
+        pred=[]
+        p_y1=self.y.sum()/len(self.y)
+        p_y2=(len(self.y)-self.y.sum())/len(self.y)
+        for i in range(len(self.Xt)):  
+#           print(self.cond_px_y0[self.Xt[i]==1])
+            t1=np.sum(np.log(self.cond_px_y1[self.Xt[i]==1]))
+            t2=np.sum(np.log(self.cond_px_y0[self.Xt[i]==1]))
+            p1=(t1+np.log(p_y1))
+            p2=(t2+np.log(p_y2))
+            if p1>p2:
+               pred.append(1)
+            else :
+                pred.append(0)
+        return pred
+        
+nb=naive_bayes()
+nb.X=X_train
+nb.y=y_train
+c1,c2=nb.prob_x_y()
+
+X=pd.read_csv(sys.argv[2],delimiter=',')
+X=X.iloc[:,0]
+X=X.apply(parse_txt)
+pred=[]
+for i in range(len(X)):
+    
+    lst=np.zeros(len(vocab),dtype=bool)
+    for a in X[i]:
+        try:
+            lst[alpha[a]]=True
+        except:
+            ()
+    nb.Xt=[lst*1]
+    pred.append(nb.predict(c1,c2))
+        
+        
+
+#pred=nb.predict(c1,c2)
+y_test=np.array(pred).flatten()
+np.savetxt(sys.argv[3],y_test,delimiter='\n')
